@@ -1,4 +1,4 @@
-FROM docker.io/library/golang:1.19.4-alpine AS build
+FROM --platform=$TARGETPLATFORM docker.io/library/golang:1.19.4-alpine AS build
 # --build-arg GOPROXY=https://goproxy.cn,direct
 ARG GOPROXY
 # --build-arg ALPINE_MIRROR=mirrors.aliyun.com
@@ -15,7 +15,7 @@ RUN cd /go/src/github.com/alibaba/kubeskoop/cmd/exporter && go build -o /go/src/
 RUN cd /go/src/github.com/alibaba/kubeskoop/cmd/skoop && go build -o /go/src/github.com/alibaba/kubeskoop/bin/skoop
 
 
-FROM docker.io/library/alpine
+FROM --platform=$TARGETPLATFORM docker.io/library/alpine
 
 RUN apk add --no-cache \
     iproute2 \
