@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/patrickmn/go-cache"
+       	log "github.com/sirupsen/logrus"
 	"github.com/vishvananda/netns"
 	"golang.org/x/exp/slog"
 )
@@ -183,17 +184,17 @@ func cacheProcess() {
 	go func(done chan struct{}) {
 		err := cacheNetTopology()
 		if err != nil {
-			logger.Warn("cache process", "err", err)
+			log.Warn("cache process", "err", err)
 		}
 		done <- struct{}{}
 	}(cacheDone)
 
 	select {
 	case <-ctx.Done():
-		logger.Info("cache process time exceeded", "latency", time.Since(start).Seconds())
+		log.Info("cache process time exceeded", "latency", time.Since(start).Seconds())
 		return
 	case <-cacheDone:
-		logger.Info("cache process finished", "latency", time.Since(start).Seconds())
+		log.Info("cache process finished", "latency", time.Since(start).Seconds())
 	}
 
 }
@@ -206,17 +207,17 @@ func cacheNetTopology() error {
 	// get all process
 	pids, err := getAllPids()
 	if err != nil {
-		logger.Warn("cache pids failed %s", err.Error())
+		log.Warn("cache pids failed %s", err.Error())
 		return err
 	}
 
-	logger.Debug("finished get all pids")
+	log.Info("finished get all pids", pids)
 	// get all netns by process
 	netnsMap := map[int]netnsMeta{}
 	for _, pid := range pids {
 		nsinum, err := getNsInumByPid(pid)
 		if err != nil {
-			logger.Warn("get ns inum of %d failed %s", pid, err.Error())
+			log.Warn("get ns inum of %d failed %s", pid, err.Error())
 			continue
 		}
 
@@ -238,17 +239,17 @@ func cacheNetTopology() error {
 		}
 
 	}
-	logger.Info("finished get all netns")
+	log.Info("finished get all netns", netnsMap)
 
 	// get netns mount point aka cni presentation
 	namedns, err := findNsfsMountpoint()
 	if err != nil {
-		logger.Warn("get nsfs mount point failed %s", err.Error())
+		log.Warn("get nsfs mount point failed %s", err.Error())
 	} else {
 		for _, mp := range namedns {
 			nsinum, err := getNsInumByNsfsMountPoint(mp)
 			if err != nil {
-				logger.Warn("get ns inum from %s point failed %s", mp, err.Error())
+				log.Warn("get ns inum from %s point failed %s", mp, err.Error())
 				continue
 			}
 			if v, ok := netnsMap[nsinum]; !ok {
@@ -264,23 +265,23 @@ func cacheNetTopology() error {
 		}
 	}
 
-	logger.Info("finished get all nsfs mount point", netnsMap)
+	log.Info("finished get all nsfs mount point", netnsMap)
 
 	// get pod meta info
 	podMap, err := getPodMetas(rcrisvc)
 	if err != nil {
-		logger.Warn("get pod meta failed %s", err.Error())
+		log.Warn("get pod meta failed %s", err.Error())
 		return err
 	}
 
-       	logger.Info("finished get all podMap ", podMap)
+       	log.Info("finished get all podMap ", podMap)
 	// if use docker, get docker sandbox
 	if top.Crimeta.RuntimeName == "docker" {
 		for sandbox, pm := range podMap {
 			if pm.nspath == "" && pm.pid == 0 {
 				pid, err := getPidForContainerBySock(sandbox)
 				if err != nil {
-					logger.Warn("get docker container", "sandbox", sandbox, "err", err.Error())
+					log.Warn("get docker container", "sandbox", sandbox, "err", err.Error())
 					continue
 				}
 				pm.pid = pid
@@ -295,13 +296,13 @@ func cacheNetTopology() error {
 			netnsMeta: nsmeta,
 			pids:      nsmeta.pids,
 		}
-		logger.Info("try related  pod", nsinum, nsmeta.mountPath)
+		log.Info("try related  pod", nsinum, nsmeta.mountPath)
 		for sandbox, pm := range podMap {
 			// 1. use cri infospec/nspath to match
 			if pm.nspath != "" &&
 				(pm.nspath == nsmeta.mountPath || pm.nspath == fmt.Sprintf("/var/%s", nsmeta.mountPath)) {
 				ent.podMeta = pm
-				logger.Info("related pod mount point", "pod", pm.name, "netns", nsmeta.inum)
+				log.Info("related pod mount point", "pod", pm.name, "netns", nsmeta.inum)
 				podCache.Set(sandbox, ent, 3*cacheUpdateInterval)
 				for _, pid := range nsmeta.pids {
 					pidCache.Set(fmt.Sprintf("%d", pid), ent, 3*cacheUpdateInterval)
@@ -314,7 +315,7 @@ func cacheNetTopology() error {
 			if err == nil {
 				if nsinum == pidns {
 					ent.podMeta = pm
-					logger.Info("related pod", "pod", pm.name, "netns", nsmeta.inum)
+					log.Info("related pod", "pod", pm.name, "netns", nsmeta.inum)
 					podCache.Set(sandbox, ent, 3*cacheUpdateInterval)
 					for _, pid := range nsmeta.pids {
 						pidCache.Set(fmt.Sprintf("%d", pid), ent, 3*cacheUpdateInterval)
@@ -325,7 +326,7 @@ func cacheNetTopology() error {
 				for _, pid := range nsmeta.pids {
 					if pm.pid == pid {
 						ent.podMeta = pm
-						logger.Info("related pod pid", "pod", pm.name, "netns", nsmeta.inum)
+						log.Info("related pod pid", "pod", pm.name, "netns", nsmeta.inum)
 						podCache.Set(sandbox, ent, 3*cacheUpdateInterval)
 						for _, pid := range nsmeta.pids {
 							pidCache.Set(fmt.Sprintf("%d", pid), ent, 3*cacheUpdateInterval)
@@ -337,6 +338,6 @@ func cacheNetTopology() error {
 		nsCache.Set(fmt.Sprintf("%d", nsinum), ent, 3*cacheUpdateInterval)
 	}
 
-	logger.Info("finished cache process")
+	log.Info("finished cache process")
 	return nil
 }
