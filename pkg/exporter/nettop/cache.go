@@ -238,8 +238,7 @@ func cacheNetTopology() error {
 		}
 
 	}
-
-	logger.Debug("finished get all netns")
+	logger.Info("finished get all netns")
 
 	// get netns mount point aka cni presentation
 	namedns, err := findNsfsMountpoint()
@@ -265,7 +264,7 @@ func cacheNetTopology() error {
 		}
 	}
 
-	logger.Debug("finished get all nsfs mount point")
+	logger.Info("finished get all nsfs mount point", netnsMap)
 
 	// get pod meta info
 	podMap, err := getPodMetas(rcrisvc)
@@ -274,6 +273,7 @@ func cacheNetTopology() error {
 		return err
 	}
 
+       	logger.Info("finished get all podMap ", podMap)
 	// if use docker, get docker sandbox
 	if top.Crimeta.RuntimeName == "docker" {
 		for sandbox, pm := range podMap {
@@ -295,13 +295,13 @@ func cacheNetTopology() error {
 			netnsMeta: nsmeta,
 			pids:      nsmeta.pids,
 		}
-		logger.Debug("try related  pod", nsinum, nsmeta.mountPath)
+		logger.Info("try related  pod", nsinum, nsmeta.mountPath)
 		for sandbox, pm := range podMap {
 			// 1. use cri infospec/nspath to match
 			if pm.nspath != "" &&
 				(pm.nspath == nsmeta.mountPath || pm.nspath == fmt.Sprintf("/var/%s", nsmeta.mountPath)) {
 				ent.podMeta = pm
-				logger.Debug("related pod mount point", "pod", pm.name, "netns", nsmeta.inum)
+				logger.Info("related pod mount point", "pod", pm.name, "netns", nsmeta.inum)
 				podCache.Set(sandbox, ent, 3*cacheUpdateInterval)
 				for _, pid := range nsmeta.pids {
 					pidCache.Set(fmt.Sprintf("%d", pid), ent, 3*cacheUpdateInterval)
@@ -314,7 +314,7 @@ func cacheNetTopology() error {
 			if err == nil {
 				if nsinum == pidns {
 					ent.podMeta = pm
-					logger.Debug("related pod", "pod", pm.name, "netns", nsmeta.inum)
+					logger.Info("related pod", "pod", pm.name, "netns", nsmeta.inum)
 					podCache.Set(sandbox, ent, 3*cacheUpdateInterval)
 					for _, pid := range nsmeta.pids {
 						pidCache.Set(fmt.Sprintf("%d", pid), ent, 3*cacheUpdateInterval)
@@ -325,7 +325,7 @@ func cacheNetTopology() error {
 				for _, pid := range nsmeta.pids {
 					if pm.pid == pid {
 						ent.podMeta = pm
-						logger.Debug("related pod pid", "pod", pm.name, "netns", nsmeta.inum)
+						logger.Info("related pod pid", "pod", pm.name, "netns", nsmeta.inum)
 						podCache.Set(sandbox, ent, 3*cacheUpdateInterval)
 						for _, pid := range nsmeta.pids {
 							pidCache.Set(fmt.Sprintf("%d", pid), ent, 3*cacheUpdateInterval)
@@ -337,6 +337,6 @@ func cacheNetTopology() error {
 		nsCache.Set(fmt.Sprintf("%d", nsinum), ent, 3*cacheUpdateInterval)
 	}
 
-	logger.Debug("finished cache process")
+	logger.Info("finished cache process")
 	return nil
 }
