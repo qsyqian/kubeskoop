@@ -300,7 +300,7 @@ func cacheNetTopology() error {
 		for sandbox, pm := range podMap {
 			// 1. use cri infospec/nspath to match
 			if pm.nspath != "" &&
-				(pm.nspath == nsmeta.mountPath || pm.nspath == fmt.Sprintf("/var/%s", nsmeta.mountPath)) {
+				(pm.nspath == nsmeta.mountPath || pm.nspath == fmt.Sprintf("/var%s", nsmeta.mountPath)) {
 				ent.podMeta = pm
 				log.Info("related pod mount point", "pod", pm.name, "netns", nsmeta.inum)
 				podCache.Set(sandbox, ent, 3*cacheUpdateInterval)
